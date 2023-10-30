@@ -1,15 +1,6 @@
-/**
- * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
- *
- * SPDX-License-Identifier: BSD-3-Clause
- */
+// #include "pico/stdlib.h"
+// #include "hardware/pwm.h"
 
-// Output PWM signals on pins 0 and 1
-
-#include "pico/stdlib.h"
-#include "hardware/pwm.h"
-
-// #define LEFT_S 13000
 #define LEFT_S 18000
 #define RIGHT_S 20000
 
@@ -108,35 +99,37 @@ void moveForward (int s) {
     pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
 }
 
+// void moveLeft(int s) {
+//     stop();
+//     setLeftForward();
+//     pwm_set_chan_level(slice_num, PWM_CHAN_A, (LEFT_S/100 * s)); 
+//     setRightForward();
+//     pwm_set_chan_level(slice_num, PWM_CHAN_B, 0); 
+// }
+
 void moveLeft(int s) {
     stop();
     setLeftForward();
     pwm_set_chan_level(slice_num, PWM_CHAN_A, (LEFT_S/100 * s)); 
-    setRightForward();
-    pwm_set_chan_level(slice_num, PWM_CHAN_B, 0); 
+    setRightBackward();
+    pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
 }
 
-// void moveLeft(int s) {
+// void moveRight (int s) {
+//     stop();
 //     setLeftForward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_A, (LEFT_S/100 * s)); 
-//     setRightBackward();
+//     pwm_set_chan_level(slice_num, PWM_CHAN_A, 0); 
+//     setRightForward();
 //     pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
 // }
 
 void moveRight (int s) {
     stop();
-    setLeftForward();
-    pwm_set_chan_level(slice_num, PWM_CHAN_A, 0); 
+    setLeftBackward();
+    pwm_set_chan_level(slice_num, PWM_CHAN_A, (LEFT_S/100 * s)); 
     setRightForward();
     pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
 }
-
-// void moveRight (int s) {
-//     setLeftBackward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_A, (LEFT_S/100 * s)); 
-//     setRightForward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
-// }
 
 void moveBackward (int s) {
     stop();
@@ -146,7 +139,7 @@ void moveBackward (int s) {
     pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
 }
 
-// INITIALISE
+// INITIALISE ------------------------------------------------------------------------------------
 
 void initMotor( ) {
 
@@ -181,28 +174,38 @@ void initMotor( ) {
 
 }
 
+// TEST ------------------------------------------------------------------------------------------
 
-int main() {
+void testMotor( ) {
 
+    for(;;) {
+        moveForward(60);
+        sleep_ms(500);
 
-    initMotor();
+        stop();
+        sleep_ms(300);
 
-    moveForward(60);
+        moveLeft(60);
+        sleep_ms(500);
 
-    // for (;;) {
+        moveRight(60);
+        sleep_ms(500);
 
-    // moveForward(60);
-    // sleep_ms(500);
-    // stop();
-    // sleep_ms(300);
-    // // moveLeft();
-    // // sleep_ms(500);
-    // // moveRight();
-    // // sleep_ms(500);
-    // moveBackward(60);
-    // sleep_ms(500);
-    // stop();
-    // sleep_ms(500);
+        moveBackward(60);
+        sleep_ms(500);
 
-    // }
+        stop();
+        sleep_ms(500);
+    }
 }
+
+
+
+// int main() {
+
+
+//     initMotor();
+//     moveForward(60);
+
+//     // testMotor();
+// }
