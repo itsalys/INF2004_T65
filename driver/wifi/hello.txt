@@ -1,0 +1,5 @@
+1. in main.c, make changes to line 9 and 10 accordingly,, like put the appropriate wifi ssid and password
+2. save, compile
+3. login to router and find the ip addr for picoW
+4. paste ip addr into browser and enter :D
+5. yay led on and off!!
