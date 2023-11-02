@@ -22,7 +22,18 @@ int main() {
     }
     // Print a success message once connected
     printf("Connected! \n");
-    
+    ip4_addr_t ipaddr, netmask, gw;
+    struct netif *netif = netif_default;
+    if (netif)
+    {
+        printf("IP Address: %s\n", ip4addr_ntoa(&netif->ip_addr));
+        printf("Netmask: %s\n", ip4addr_ntoa(&netif->netmask));
+        printf("Gateway: %s\n", ip4addr_ntoa(&netif->gw));
+    }
+    else
+    {
+        printf("Network interface not found\n");
+    }
     // Initialise web server
     httpd_init();
     printf("Http server initialised\n");
