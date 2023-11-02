@@ -1,8 +1,9 @@
 // #include "pico/stdlib.h"
 // #include "hardware/pwm.h"
 
-#define LEFT_S 18000
-#define RIGHT_S 20000
+#define DEFAULT_SPEED 62500
+#define LEFT_S 62500
+#define RIGHT_S 62500
 
 #define LEFT_PMW 0
 #define RIGHT_PMW 1
@@ -45,50 +46,6 @@ void stop () {
     pwm_set_chan_level(slice_num, PWM_CHAN_B, 0); 
 }
 
-// STATIC SPEED 
-
-// void moveForward () {
-//     setLeftForward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_A, LEFT_S); 
-//     setRightForward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_B, RIGHT_S); 
-// }
-
-// void moveLeft() {
-//     setLeftForward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_A, LEFT_S); 
-//     setRightForward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_B, 0); 
-// }
-
-// // void moveLeft() {
-// //     setLeftForward();
-// //     pwm_set_chan_level(slice_num, PWM_CHAN_A, LEFT_S); 
-// //     setRightBackward();
-// //     pwm_set_chan_level(slice_num, PWM_CHAN_B, RIGHT_S); 
-// // }
-
-// void moveRight () {
-//     setLeftForward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_A, 0); 
-//     setRightForward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_B, RIGHT_S); 
-// }
-
-// // void moveRight () {
-// //     setLeftBackward();
-// //     pwm_set_chan_level(slice_num, PWM_CHAN_A, LEFT_S); 
-// //     setRightForward();
-// //     pwm_set_chan_level(slice_num, PWM_CHAN_B, RIGHT_S); 
-// // }
-
-// void moveBackward () {
-//     setLeftBackward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_A, LEFT_S); 
-//     setRightBackward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_B, RIGHT_S); 
-// }
-
 // SPECIFY SPEED : S/100
 
 void moveForward (int s) {
@@ -99,37 +56,37 @@ void moveForward (int s) {
     pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
 }
 
-// void moveLeft(int s) {
-//     stop();
-//     setLeftForward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_A, (LEFT_S/100 * s)); 
-//     setRightForward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_B, 0); 
-// }
-
 void moveLeft(int s) {
     stop();
     setLeftForward();
     pwm_set_chan_level(slice_num, PWM_CHAN_A, (LEFT_S/100 * s)); 
-    setRightBackward();
-    pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
+    setRightForward();
+    pwm_set_chan_level(slice_num, PWM_CHAN_B, 0); 
 }
 
-// void moveRight (int s) {
+// void moveLeft(int s) {
 //     stop();
 //     setLeftForward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_A, 0); 
-//     setRightForward();
+//     pwm_set_chan_level(slice_num, PWM_CHAN_A, (LEFT_S/100 * s)); 
+//     setRightBackward();
 //     pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
 // }
 
 void moveRight (int s) {
     stop();
-    setLeftBackward();
-    pwm_set_chan_level(slice_num, PWM_CHAN_A, (LEFT_S/100 * s)); 
+    setLeftForward();
+    pwm_set_chan_level(slice_num, PWM_CHAN_A, 0); 
     setRightForward();
     pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
 }
+
+// void moveRight (int s) {
+//     stop();
+//     setLeftBackward();
+//     pwm_set_chan_level(slice_num, PWM_CHAN_A, (LEFT_S/100 * s)); 
+//     setRightForward();
+//     pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
+// }
 
 void moveBackward (int s) {
     stop();
@@ -166,7 +123,7 @@ void initMotor( ) {
 
     slice_num = pwm_gpio_to_slice_num(0); // Find out which PWM slice is connected to GPIO 0 (it's slice 0)
     pwm_set_clkdiv(slice_num, 100); 
-    pwm_set_wrap(slice_num, 20000);  // Set period
+    pwm_set_wrap(slice_num, DEFAULT_SPEED);  // Set period
 
      stop(); // init stop
 
@@ -179,20 +136,21 @@ void initMotor( ) {
 void testMotor( ) {
 
     for(;;) {
-        moveForward(60);
-        sleep_ms(500);
+        moveForward(100);
+        sleep_ms(800);
 
-        stop();
-        sleep_ms(300);
+        moveForward(50);
+        sleep_ms(800);
+        
 
-        moveLeft(60);
-        sleep_ms(500);
+        moveLeft(70);
+        sleep_ms(800);
 
-        moveRight(60);
-        sleep_ms(500);
+        moveRight(70);
+        sleep_ms(800);
 
-        moveBackward(60);
-        sleep_ms(500);
+        moveBackward(70);
+        sleep_ms(1500);
 
         stop();
         sleep_ms(500);

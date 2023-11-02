@@ -3,9 +3,10 @@ add_executable(encoder
         )
 
 # include libraries & dependencies
-target_link_libraries(encoder pico_stdlib)
+target_link_libraries(encoder pico_stdlib hardware_pwm)
 
 pico_enable_stdio_usb(encoder 1)
+
 
 # create map/bin/hex file etc.
 pico_add_extra_outputs(encoder)
