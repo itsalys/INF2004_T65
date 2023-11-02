@@ -10,10 +10,14 @@ int main() {
     initEncoder();
     initMotor();
 
+    sleep_ms(100);
+
     testMotor();
 
+    
 
-    // for (;;) {
-    //     busy_wait_ms(INT8_MAX);
-    // }
+
+    for (;;) {
+        busy_wait_ms(INT8_MAX);
+    }
 }
