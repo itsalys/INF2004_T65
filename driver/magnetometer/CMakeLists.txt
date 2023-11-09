@@ -9,6 +9,6 @@ target_link_libraries(magnetometer pico_stdlib hardware_i2c)
 pico_add_extra_outputs(magnetometer)
 
 # add url via pico_set_program_url
-example_auto_set_url(magnetometer)
+# example_auto_set_url(magnetometer)
 
 pico_enable_stdio_usb(magnetometer 1)

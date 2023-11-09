@@ -1,13 +1,13 @@
-cmake_minimum_required(VERSION 3.13)
+# # cmake_minimum_required(VERSION 3.13)
 
-set(PROGRAM_NAME pico_w_webserver)
-set(PICO_BOARD pico_w)
+# set(PROGRAM_NAME pico_w_webserver)
+# set(PICO_BOARD pico_w)
 
-include(pico_sdk_import.cmake)
+# include(pico_sdk_import.cmake)
 
-project(pico_w_webserver)
+# project(pico_w_webserver)
 
-pico_sdk_init()
+# pico_sdk_init()
 
 message("Running makefsdata python script")
 execute_process(COMMAND
@@ -15,9 +15,9 @@ execute_process(COMMAND
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
 )
 
-add_executable(${PROGRAM_NAME}
-    main.c
-)
+# add_executable(${PROGRAM_NAME}
+#     main.c
+# )
 
 target_include_directories(${PROGRAM_NAME} PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}

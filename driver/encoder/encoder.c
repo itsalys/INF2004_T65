@@ -1,7 +1,6 @@
-// #include <stdio.h>
-// #include "pico/stdlib.h"
-// #include "hardware/pwm.h"
-// #include "../motor/motor.c"
+#include <stdio.h>
+#include "pico/stdlib.h"
+#include "hardware/pwm.h"
 
 #define RIGHT_ENCODER_PIN 15
 #define LEFT_ENCODER_PIN 14
@@ -82,18 +81,3 @@ void initEncoder( )
 void testEncoder( ) {
     
 }
-
-// int main() {
-//     stdio_init_all();
-
-
-//     initEncoder();
-//     initMotor();
-
-//     sleep_ms(4000);
-//     moveForward(50);
-
-//     for(;;);
-
-
-// }

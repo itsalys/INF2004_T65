@@ -18,6 +18,7 @@ endif()
 
 # Initialize the SDK
 pico_sdk_init()
+enable_testing()
 
 # include(example_auto_set_url.cmake)
 # Add blink example

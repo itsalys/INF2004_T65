@@ -48,17 +48,17 @@ uint64_t getInch(uint trigPin, uint echoPin)
     return (long)pulseLength / 74.f / 2.f;
 }
 
-int main() {
-    stdio_init_all();
+// int main() {
+//     stdio_init_all();
 
-    printf("Hello GPIO IRQ\n");
+//     printf("Hello GPIO IRQ\n");
 
-    setupUltrasonicPins(0,1); //trigger pin and echo pin
+//     setupUltrasonicPins(0,1); //trigger pin and echo pin
 
-    // Wait forever
-    while (1){
-        uint64_t distance=getCm(0,1); //getCM returns value of unsigned integer 64
-        printf("Distance = %lldcm \n", distance);
-        sleep_ms(1000);
-    }
-}
+//     // Wait forever
+//     while (1){
+//         uint64_t distance=getCm(0,1); //getCM returns value of unsigned integer 64
+//         printf("Distance = %lldcm \n", distance);
+//         sleep_ms(1000);
+//     }
+// }

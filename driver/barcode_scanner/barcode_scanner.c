@@ -404,14 +404,14 @@ void barcode_IRQ()
 } 
 
 
-int main()
-{
-    stdio_init_all();
-    init_barcode();
+// int main()
+// {
+//     stdio_init_all();
+//     init_barcode();
 
-    while (1)
-    {
-      barcode_IRQ();
-    }
-    return 0;
-}
+//     while (1)
+//     {
+//       barcode_IRQ();
+//     }
+//     return 0;
+// }

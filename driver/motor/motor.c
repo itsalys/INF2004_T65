@@ -1,5 +1,5 @@
-// #include "pico/stdlib.h"
-// #include "hardware/pwm.h"
+#include "pico/stdlib.h"
+#include "hardware/pwm.h"
 
 #define DEFAULT_SPEED 62500
 #define LEFT_S 62500
