@@ -13,7 +13,6 @@
 #define NUM_BLACK_BAR 15
 #define NUM_WHITE_BAR 15
 
-
 void init_barcode();
 void combineArray(char bars[], char spaces[], char combined[]);
 void decipherBarcode(char* combined);
@@ -37,9 +36,9 @@ int whiteOffSet = 1;
 char black[15];
 char white[15];
 char barcode[10];
-char combined[30];
-char firstChar[10];
-char thirdChar[10];
+char combined[50];
+char firstChar[17];
+char thirdChar[17];
 char bar[15];
 char space[15];
 
@@ -75,19 +74,19 @@ void combineArray(char bars[], char spaces[], char combined[])
 void decipherBarcode(char *combined)
 {
     int i = 0;
-    for (i = 10; i < 20; i++)
+    for (i = 17; i < 50; i++)
     {
-        if (i < 10)
+        if (i < 17)
         {
             firstChar[i - 1] = combined[i];
         }
-        else if (i >= 10 && i < 19)
+        else if (i >= 17 && i < 33)
         {
-            barcode[i - 10] = combined[i];
+            barcode[i - 17] = combined[i];
         }
-        else if (i >= 21 && i < 30)
+        else if (i >= 33 && i < 50)
         {
-            thirdChar[i - 21] = combined[i];
+            thirdChar[i - 33] = combined[i];
         }
     }
 }
@@ -100,7 +99,7 @@ void printArray(char arr[], int size)
     printf("\nElements are : ");
     for (i = 0; i < size; i++)
     {
-        printf("\n\tarr[%d] : %d", i, arr[i]);
+        printf("\n\tbinary[%d] : %d", i, arr[i]);
     }
     printf("\n");
 }
@@ -330,7 +329,7 @@ void detectBar_raw(int adc_reading)
         }
         avgBlackTime = sumBlackTime / (NUM_BLACK_BAR);
 
-        // add into the barcode array [0] to [8] -> 9 items
+        // add into the barcode array [0] to [17] -> 16 items
         for (i = 0; i < blackCounter; i++)
         {
             if (black[i] < avgBlackTime) // thin black bar
