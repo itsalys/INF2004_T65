@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "*.embeddedhtml": "html",
+        "cyw43_arch.h": "c",
+        "stdlib.h": "c",
+        "httpd.h": "c",
+        "lwipopts.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "enabled"
+}
