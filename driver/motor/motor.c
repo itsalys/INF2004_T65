@@ -5,10 +5,10 @@
 #define LEFT_S 62500
 #define RIGHT_S 62500
 
-#define LEFT_PMW 0
+#define LEFT_PMW 0 // EN
 #define RIGHT_PMW 1
 
-#define LEFT_F 2
+#define LEFT_F 2 // IN
 #define LEFT_B 3
 #define RIGHT_F 4
 #define RIGHT_B 5

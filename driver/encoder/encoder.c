@@ -12,6 +12,7 @@ uint32_t last_edge_time[2] = {0, 0};
 #define WHEEL_CIRCUMFERENCE 0.200 // in m estimated, distance of 1 rotation
 #define PULSE_DISTANCE (0.200 / 20) // in m estimated, distance of 1 pulse/notch
 float distance[2] = {0.0 ,0.0}; // {L, R}
+float speed[2] = {0.0, 0.0}; // Speed in m/s for each wheel
 
 int counter_pulse[2] = {0,0};
 
@@ -39,16 +40,26 @@ void gpio_callback(uint gpio, uint32_t events)
             // printf("\nPulse Width: %.5fs ", pulse_width);
 
             // Calculate speed and update distance
-            float speed = WHEEL_CIRCUMFERENCE / pulse_width; // Speed in m/s
+            speed[i] = WHEEL_CIRCUMFERENCE / pulse_width; // Speed in m/s
             distance[i] += WHEEL_CIRCUMFERENCE;                 // Update total distance
 
 
             if (i == 0) printf("LEFT\t");
             else if (i == 1) printf("RIGHT\t");
             
-            printf("Speed: %.5f m/s, Total Distance Traveled: %.5f m\n", speed, distance[i]);
+            printf("Speed: %.5f m/s, Total Distance Traveled: %.5f m\n", speed[i], distance[i]);
         }
     }
+}
+
+// Function to get the speed of the left wheel
+float getLeftWheelSpeed() {
+    return speed[0];
+}
+
+// Function to get the speed of the right wheel
+float getRightWheelSpeed() {
+    return speed[1];
 }
 
 // void enableEncoder( ) {
@@ -73,6 +84,7 @@ void initEncoder( )
     sleep_ms(100);
     gpio_set_irq_enabled_with_callback(RIGHT_ENCODER_PIN, GPIO_IRQ_EDGE_RISE, true, &gpio_callback);
     gpio_set_irq_enabled_with_callback(LEFT_ENCODER_PIN, GPIO_IRQ_EDGE_RISE, true, &gpio_callback);
+
     return;
 }
 
