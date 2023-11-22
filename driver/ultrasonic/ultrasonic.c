@@ -7,12 +7,26 @@
 
 int timeout = 26100;
 
-void setupUltrasonicPins(uint trigPin, uint echoPin)
-{
-    gpio_init(trigPin);
-    gpio_init(echoPin);
-    gpio_set_dir(trigPin, GPIO_OUT);
-    gpio_set_dir(echoPin, GPIO_IN);
+#define ULTRA_ECHO 16
+#define ULTRA_TRIG 17
+// #define ULTRA_GND built-int
+#define ULTRA_VCC 18
+
+void initUltrasonic() {
+    
+    // init ULTRA ECO
+    gpio_init(ULTRA_ECHO);             
+    gpio_set_dir(ULTRA_ECHO, GPIO_IN);
+
+    // init ULTRA TRIG
+    gpio_init(ULTRA_TRIG);             
+    gpio_set_dir(ULTRA_TRIG, GPIO_OUT);
+
+    // init UTRA VCC
+    gpio_init(ULTRA_VCC);             
+    gpio_set_dir(ULTRA_VCC, GPIO_OUT);
+    gpio_put(ULTRA_VCC, 1);
+
 }
 
 uint64_t getPulse(uint trigPin, uint echoPin)
@@ -48,17 +62,22 @@ uint64_t getInch(uint trigPin, uint echoPin)
     return (long)pulseLength / 74.f / 2.f;
 }
 
+int getUltrasonicDistance() {
+    int temp = getCm(ULTRA_TRIG, ULTRA_ECHO);
+    return temp;
+}
+
 // int main() {
 //     stdio_init_all();
 
 //     printf("Hello GPIO IRQ\n");
 
-//     setupUltrasonicPins(0,1); //trigger pin and echo pin
+//     initUltrasonic();
 
 //     // Wait forever
 //     while (1){
-//         uint64_t distance=getCm(0,1); //getCM returns value of unsigned integer 64
-//         printf("Distance = %lldcm \n", distance);
+//         // uint64_t distance=getUltrasonicDistance();
+//         printf("Distance = %lldcm \n", getUltrasonicDistance());
 //         sleep_ms(1000);
 //     }
 // }

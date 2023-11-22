@@ -2,16 +2,20 @@
 #include "hardware/pwm.h"
 
 #define DEFAULT_SPEED 62500
-#define LEFT_S 62500
+// #define LEFT_S 62500
+#define LEFT_S 60500 // hardcoded
 #define RIGHT_S 62500
 
-#define LEFT_PMW 0 // EN
-#define RIGHT_PMW 1
+// Motor to turn left - physically on the right
+#define LEFT_PMW 0  // ENB
+#define LEFT_F 2    // IN4
+#define LEFT_B 3    // IN3
 
-#define LEFT_F 2 // IN
-#define LEFT_B 3
-#define RIGHT_F 4
-#define RIGHT_B 5
+
+// Motor to turn right - physically on the left
+#define RIGHT_PMW 1 // ENA
+#define RIGHT_F 4   // IN2
+#define RIGHT_B 5   // IN1
 
 uint slice_num;
 
@@ -46,6 +50,14 @@ void stop () {
     pwm_set_chan_level(slice_num, PWM_CHAN_B, 0); 
 }
 
+void LEFT_setSpeed(int s) {
+    pwm_set_chan_level(slice_num, PWM_CHAN_A, (LEFT_S/100 * s)); 
+}
+
+void RIGHT_setSpeed(int s) {
+    pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
+}
+
 // SPECIFY SPEED : S/100
 
 void moveForward (int s) {
@@ -64,13 +76,13 @@ void moveLeft(int s) {
     pwm_set_chan_level(slice_num, PWM_CHAN_B, 0); 
 }
 
-// void moveLeft(int s) {
-//     stop();
-//     setLeftForward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_A, (LEFT_S/100 * s)); 
-//     setRightBackward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
-// }
+void pivotLeft(int s) {
+    stop();
+    setLeftForward();
+    pwm_set_chan_level(slice_num, PWM_CHAN_A, (LEFT_S/100 * s)); 
+    setRightBackward();
+    pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
+}
 
 void moveRight (int s) {
     stop();
@@ -80,13 +92,13 @@ void moveRight (int s) {
     pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
 }
 
-// void moveRight (int s) {
-//     stop();
-//     setLeftBackward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_A, (LEFT_S/100 * s)); 
-//     setRightForward();
-//     pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
-// }
+void pivotRight (int s) {
+    stop();
+    setLeftBackward();
+    pwm_set_chan_level(slice_num, PWM_CHAN_A, (LEFT_S/100 * s)); 
+    setRightForward();
+    pwm_set_chan_level(slice_num, PWM_CHAN_B, (RIGHT_S/100 * s)); 
+}
 
 void moveBackward (int s) {
     stop();
