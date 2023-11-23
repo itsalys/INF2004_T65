@@ -7,7 +7,7 @@
 #include "hardware/gpio.h"
 #include "pico/time.h"
 
-#define SENSOR_PIN       26
+#define SENSOR_PIN       28
 #define CHAR_ARR_SIZE       10
 #define CONCATENATED        31
 #define MIN_THRESHOLD      1500                
