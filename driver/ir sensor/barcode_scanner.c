@@ -1,416 +1,327 @@
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
+#include <stdint.h>
 #include "pico/stdlib.h"
-#include "hardware/irq.h"
 #include "hardware/adc.h"
+#include "hardware/irq.h"
+#include "hardware/gpio.h"
+#include "pico/time.h"
 
-#define ADC_NUM 0
-#define BARCODE_PIN 26 // GPIO pin 26 ADC0
-#define ADC_VREF 3.3
-#define ADC_RANGE (1 << 12)                      // 2^12
-#define ADC_CONVERT (ADC_VREF / (ADC_RANGE - 1)) // 3.3/4097
-#define NUM_BLACK_BAR 15
-#define NUM_WHITE_BAR 15
+#define SENSOR_PIN       26
+#define CHAR_ARR_SIZE       10
+#define CONCATENATED        31
+#define MIN_THRESHOLD      1500                
+#define MAX_THRESHOLD      5000               
+#define THIN_WHITE_BAR      "1"
+#define WIDE_WHITE_BAR      "111"
+#define THIN_BLACK_BAR      "0"
+#define WIDE_BLACK_BAR      "000"
 
-void init_barcode();
-void combineArray(char bars[], char spaces[], char combined[]);
-void decipherBarcode(char* combined);
-void printArray(char arr[], int size);
-char compareArray(char a[], char b[], int size);
-void decodeBarcode();
-void detectBar(int adc_reading);
-void barcode_IRQ();
+volatile bool white_surface_detected = false;   //Idk if needed.
+absolute_time_t white_surface_start_time;       // Needed.
+absolute_time_t black_surface_start_time;       // Needed.
+uint32_t elapsed_seconds = 0;
+uint32_t last_elapsed_seconds = 0;
 
-static volatile float curatedRes;
-int adcResult, adcInterrupt, startTime = 0;
-int totalAdc, avgResult = 0;
+// Creating a Array Pointer to Store a Single Character.
+static char *charArr[CHAR_ARR_SIZE];
 
-int avg, currentTime, whiteCounter, blackCounter = 0;
-int isBlack = 1;
-int lineThreshold = 2000;
-int avgBlackTime, sumBlackTime, avgWhiteTime, sumWhiteTime, i = 0;
-int blackLineCount, whiteLineCount = 0;
-int whiteOffSet = 1;
+// Creating a Variable to Store Character Array.
+static char charCode[CONCATENATED];
 
-char black[15];
-char white[15];
-char barcode[10];
-char combined[50];
-char firstChar[17];
-char thirdChar[17];
-char bar[15];
-char space[15];
+// Creating a static Position counter.
+static int currentPosition = 0;
 
-/* line sensor */
-void init_barcode()
+// Creating a Variable to Store the Character String.
+static char result;
+
+// Creating a Variable to Store the Last Interrupt Event (no event/ edge rise/ edge fall)
+typedef enum {
+    NONE,
+    EDGE_RISE,
+    EDGE_FALL
+} LastInterruptEvent;
+static LastInterruptEvent last_event = NONE;
+
+// Defining a Struct for decrpyting Barcode39 Characters.
+typedef struct {
+    char character;
+    char pattern[CONCATENATED];
+} Barcode39Chars;
+
+// Defining the Barcode39 Characters and their individual Pattern.
+static const Barcode39Chars Barcode39Table[] = {
+    {'*' , "1000101110111010"},
+    {'*' , "1011101110100010"},
+    {'A' , "1110101000101110"},
+    {'A' , "1110100010101110"},
+    {'B' , "1011101000101110"},
+    {'B' , "1110100010111010"},
+    {'C' , "1110111010001010"},
+    {'c' , "1010001011101110"},
+    {'D' , "1010111000101110"},
+    {'D' , "1110100011101010"},
+    {'E' , "1110101110001010"},
+    {'E' , "1010001110101110"},
+    {'F' , "1011101110001010"},
+    {'F' , "1010001110111010"},
+    {'G' , "1010100011101110"},
+    {'G' , "1110111000101010"},
+    {'H' , "1110101000111010"},
+    {'H' , "1011100010101110"},
+    {'I' , "1011101000111010"},
+    {'I' , "1011100010111010"},
+    {'J' , "1010111000111010"},
+    {'J' , "1011100011101010"},
+    {'K' , "1110101010001110"},
+    {'K' , "1110001010101110"},
+    {'L' , "1011101010001110"},
+    {'L' , "1110001010111010"},
+    {'M' , "1110111010100010"},
+    {'M' , "1000101011101110"},
+    {'N' , "1010111010001110"},
+    {'N' , "1110001011101010"},
+    {'O' , "1110101110100010"},
+    {'O' , "1000101110101110"},
+    {'P' , "1011101110100010"},
+    {'P' , "1000101110111010"},
+    {'Q' , "1010101110001110"},
+    {'Q' , "1110001110101010"},
+    {'R' , "1110101011100010"},
+    {'R' , "1000111010101110"},
+    {'S' , "1011101011100010"},
+    {'S' , "1000111010111010"},
+    {'T' , "1010111011100010"},
+    {'T' , "1000111011101010"},
+    {'U' , "1110001010101110"},
+    {'U' , "1110101010001110"},
+    {'V' , "1000111010101110"},
+    {'V' , "1110101011100010"},
+    {'W' , "1110001110101010"},
+    {'W' , "1010101110001110"},
+    {'X' , "1000101110101110"},
+    {'X' , "1110101110100010"},
+    {'Y' , "1110001011101010"},
+    {'Y' , "1010111010001110"},
+    {'Z' , "1000111011101010"},
+    {'Z' , "1010111011100010"},
+    {'-' , "1000101011101110"},
+    {'.' , "1110001010111010"},
+    {'$' , "1000100010001010"},
+    {'/' , "1000100010100010"},
+    {'+' , "1000101000100010"},
+    {'%' , "1010001000100010"},
+    {' ' , "1000111010111010"},
+};
+
+// Defining the TABLE_SIZE of the Barcode39Table.
+#define TABLE_SIZE  (sizeof(Barcode39Table) / sizeof(Barcode39Table[0])) //sizeofTable/sizeofElement
+
+// Test Function to Print Array.
+static void printArray(char **arr) 
 {
-    adc_init();
-    adc_gpio_init(BARCODE_PIN + ADC_NUM); // make sure GPIO is high-impedance, no pullups
-    adc_select_input(ADC_NUM);            // GPIO 26 ADC 0
-}
-
-/* To combine the black and white bar*/
-void combineArray(char bars[], char spaces[], char combined[])
-{
-    int i = 0, j = 0, k = 0;
-
-    for (i = 0; i < 30; i++)
-    {
-        if (i % 2 == 0)
-        {
-            combined[i] = bars[k];
-            k++;
+    printf("\nArray Contents: ");
+    for (int i = 0; i < CHAR_ARR_SIZE; i++) {
+        if (arr[i]) {
+            printf("%s ", arr[i]);
+        } else {
+            printf("(null) ");  // for null pointers
         }
-        else
-        {
-            combined[i] = spaces[j];
-            j++;
-        }
-    }
-}
-
-/* To break down the array to start, barcode, end arrays*/
-void decipherBarcode(char *combined)
-{
-    int i = 0;
-    for (i = 17; i < 50; i++)
-    {
-        if (i < 17)
-        {
-            firstChar[i - 1] = combined[i];
-        }
-        else if (i >= 17 && i < 33)
-        {
-            barcode[i - 17] = combined[i];
-        }
-        else if (i >= 33 && i < 50)
-        {
-            thirdChar[i - 33] = combined[i];
-        }
-    }
-}
-
-/* To print array element */
-void printArray(char arr[], int size)
-{
-    int i = 0;
-
-    printf("\nElements are : ");
-    for (i = 0; i < size; i++)
-    {
-        printf("\n\tbinary[%d] : %d", i, arr[i]);
     }
     printf("\n");
 }
 
-/* To compare array elements */
-char compareArray(char a[], char b[], int size)
+// Function to Append Values to a Pointer Array.
+void appendArrayValue(char **arr, const char *value) 
 {
-    int i;
-    for (i = 0; i < size; i++)
+    // Shift all elements down by one
+    for (int i = 0; i < CHAR_ARR_SIZE - 1; i++) {
+        arr[i] = arr[i + 1];
+    }
+
+    // Insert new value at the latest index
+    arr[CHAR_ARR_SIZE - 1] = (char *)value;
+
+    // printf("Inserted.\n");
+    printArray(arr);
+}
+
+// Function to Concatenate the Array Values to a single String.
+char* concatenateArrayValue(char **arr)
+{
+    // Initialize the string as empty.
+    charCode[0] = '\0';
+
+    for (int i = 0; i < CHAR_ARR_SIZE; i++)
     {
-        if (a[i] != b[i])
-            return 1;
+        if (arr[i])
+        {
+            strcat(charCode, arr[i]);
+        }
+    }
+}
+
+// Function to check Character String with the Barcode List.
+char checkPattern(const char *pattern)
+{
+    for (size_t i = 0; i < TABLE_SIZE; i++) {
+        if (strcmp(Barcode39Table[i].pattern, pattern) == 0) {
+            return Barcode39Table[i].character;
+        }
+    }
+    return '\0';  // Return null character if not found
+}
+
+
+// Interrupt! Edge Rise / Edge Fall.
+void white_surface_detected_handler(uint gpio, uint32_t events)
+{
+    // Check for consecutive Edge Falls
+    if ((events & GPIO_IRQ_EDGE_FALL) && last_event == EDGE_FALL) {
+        return; // Ignore this interrupt
+    }
+
+    // Check for consecutive Edge Rises
+    if ((events & GPIO_IRQ_EDGE_RISE) && last_event == EDGE_RISE) {
+        return; // Ignore this interrupt
+    }
+
+    // This Event detects a White Bar.
+    if (events & GPIO_IRQ_EDGE_FALL)
+    {
+        last_event = EDGE_FALL;
+        /*  If it detects White as the 1st Position of the new Array, 
+            It should be ignored as the Barcode39 starts with a Black at All Times. */
+        if(currentPosition == 0)
+        {
+            // Do nothing.
+        }
+        else
+        {
+            // Check if the Value is a Wide or Thin Bar, based on the running average and thresholds.
+            if ( (elapsed_seconds > MIN_THRESHOLD) && (elapsed_seconds < MAX_THRESHOLD) )
+            {
+                // Append the Wide Value into the charArr.
+                appendArrayValue(charArr, WIDE_WHITE_BAR); //Wide white bar
+            }
+            else if (elapsed_seconds < MIN_THRESHOLD)
+            {
+                // Append the Thin Value into the charArr.
+                appendArrayValue(charArr, THIN_WHITE_BAR); //Thin white bar
+            }
+            else
+            {
+                // Append a ? Value into the charArr to show running average is not accurate.
+                appendArrayValue(charArr, "?");
+            }
+
+            white_surface_detected = true;
+            white_surface_start_time = get_absolute_time();
+
+            // Increment the current position.
+            currentPosition++;
+
+            concatenateArrayValue(charArr); //concatenate array into one string
+            // printf("\nCharacter Code is: %s\n\n", charCode);
+            result = checkPattern(charCode);
+            if (result != '\0')
+            {
+                printf("Pattern Detected %s! The Character is %c\n", charCode, result);
+                currentPosition = 0;
+            }
+
+            // Check if we've reached the end of the array
+            if (currentPosition >= CHAR_ARR_SIZE)
+            {
+                currentPosition = 0;  // Wrap around to the start
+            }
+
+        }
+    }
+    // This Event detects a Black Bar.
+    else if (events & GPIO_IRQ_EDGE_RISE)
+    {
+        last_event = EDGE_RISE;
+        /*  If it detects Black as the last Position of the Array, 
+            It should be ignored as the Barcode39 ends with a White at All Times. */
+        if (currentPosition == 10)
+        {
+            // Do nothing.
+        }
+        else
+        {
+            // Check if the Value is a Wide or Thin Bar, based on the running average and thresholds.
+            if ( (elapsed_seconds > MIN_THRESHOLD) && (elapsed_seconds < MAX_THRESHOLD) )
+            {
+                // Append the Wide Value into the charArr.
+                appendArrayValue(charArr, WIDE_BLACK_BAR);
+            }
+            else if (elapsed_seconds < MIN_THRESHOLD)
+            {
+                // Append the Thin Value into the charArr.
+                appendArrayValue(charArr, THIN_BLACK_BAR);
+            }
+            else
+            {
+                // Append a ? Value into the charArr to show running average is not accurate.
+                appendArrayValue(charArr, "?");
+            }
+
+            white_surface_detected = false;
+            black_surface_start_time = get_absolute_time();
+
+            // Increment the current position.
+            currentPosition++;
+
+            concatenateArrayValue(charArr);
+            // printf("\nCharacter Code is: %s\n\n", charCode);
+            result = checkPattern(charCode);
+            if (result != '\0')
+            {
+                printf("Pattern Detected %s! The Character is %c\n", charCode, result);
+                currentPosition = 0;
+            }
+
+            // Check if we've reached the end of the array
+            if (currentPosition >= CHAR_ARR_SIZE)
+            {
+                currentPosition = 0;  // Wrap around to the start
+            }
+        }
+    }
+}
+
+int main()
+{
+    stdio_init_all();
+
+    gpio_init(SENSOR_PIN);
+    gpio_set_dir(SENSOR_PIN, GPIO_IN);
+    // FALL or RISE will trigger the interrupt, true = enable interrupt
+    gpio_set_irq_enabled_with_callback(SENSOR_PIN, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &white_surface_detected_handler);
+
+    while (1)
+    {
+        if (white_surface_detected)
+        {
+            absolute_time_t current_time = get_absolute_time();
+            // absolute_time_diff_us returns difference in ms between 2 timestamps
+            elapsed_seconds = absolute_time_diff_us(white_surface_start_time, current_time) / 1000;
+
+            printf("White -- Time elapsed: %d ms\n", elapsed_seconds);
+            // printf("Current Counter: %d\n", currentPosition);
+        }
+        else
+        {
+            absolute_time_t current_time = get_absolute_time();
+            elapsed_seconds = absolute_time_diff_us(black_surface_start_time, current_time) / 1000;
+
+            printf("Black -- Time elapsed: %d ms\n", elapsed_seconds);
+            // printf("Current Counter: %d\n", currentPosition);
+        }
+        
+        // Add a delay to avoid rapid readings (adjust as needed)
+        sleep_ms(50); // Sleep for 100 milliseconds
     }
     return 0;
 }
-
-/*decode barcode*/
-void decodeBarcode()
-{
-    char A[16] = {1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0};
-    char B[16] = {1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0};
-    char C[16] = {1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0};
-    char D[16] = {1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0};
-    char E[16] = {1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0};
-    char F[16] = {1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0};
-    char G[16] = {1, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0};
-    char H[16] = {1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0};
-    char I[16] = {1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0};
-    char J[16] = {1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0};
-    char K[16] = {1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0};
-    char L[16] = {1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0};
-    char M[16] = {1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0};
-    char N[16] = {1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1 ,0};
-    char O[16] = {1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0};
-    char P[16] = {1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0};
-    char Q[16] = {1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0};
-    char R[16] = {1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0};
-    char S[16] = {1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0};
-    char T[16] = {1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0};
-    char U[16] = {1, 1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0};
-    char V[16] = {1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0};
-    char W[16] = {1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0};
-    char X[16] = {1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0};
-    char Y[16] = {1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0};
-    char Z[16] = {1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0};
-    char start[16] = {1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0};
-    char end[16] = {1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1};
-
-    if (compareArray(A, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is A\n");
-    }
-    else if (compareArray(B, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is B\n");
-    }
-    else if (compareArray(C, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is C\n");
-    }
-    else if (compareArray(D, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is D\n");
-    }
-    else if (compareArray(E, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is E\n");
-    }
-    else if (compareArray(F, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is F\n");
-    }
-    else if (compareArray(G, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is G\n");
-    }
-    else if (compareArray(H, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is H\n");
-    }
-    else if (compareArray(I, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is I\n");
-    }
-    else if (compareArray(J, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is J\n");
-    }
-    else if (compareArray(K, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is K\n");
-    }
-    else if (compareArray(L, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is L\n");
-    }
-    else if (compareArray(M, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is M\n");
-    }
-    else if (compareArray(N, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is N\n");
-    }
-    else if (compareArray(O, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is O\n");
-    }
-    else if (compareArray(P, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is P\n");
-    }
-    else if (compareArray(Q, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is Q\n");
-    }
-    else if (compareArray(R, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is R\n");
-    }
-    else if (compareArray(S, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is S\n");
-    }
-    else if (compareArray(T, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is T\n");
-    }
-    else if (compareArray(U, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is U\n");
-    }
-    else if (compareArray(V, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is V\n");
-    }
-    else if (compareArray(W, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is W\n");
-    }
-    else if (compareArray(X, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is X\n");
-    }
-    else if (compareArray(Y, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is Y\n");
-    }
-    else if (compareArray(Z, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is Z\n");
-    }
-    else if (compareArray(start, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is *\n");
-    }
-    else if (compareArray(end, barcode, 16) == 0)
-    {
-        printArray(barcode, 16);
-        printf("Character identified is *\n");
-    }
-    else
-    {
-        printArray(barcode, 16);
-        printf("Different elements, no matches\n");
-    }
-}
-
-/*get barcode reading*/
-void detectBar_raw(int adc_reading)
-{
-    // barcode
-    if (adc_reading > lineThreshold && !isBlack)
-    {
-        currentTime = time_us_32() - startTime;
-        startTime = time_us_32();
-        black[blackCounter] = currentTime;
-        blackCounter++;
-        isBlack = 1;
-        //printf("BLACK %lld\n", currentTime);
-    }
-    else if (adc_reading < lineThreshold && isBlack)
-    {
-        currentTime = time_us_32() - startTime;
-        startTime = time_us_32();          // reset startTime to capture the time now
-        white[whiteCounter] = currentTime; // set the white bar benchmark
-        whiteCounter++;
-        isBlack = 0;
-        //printf("WHITE %lld\n", currentTime);
-    }
-
-    if (blackCounter == NUM_BLACK_BAR) // check if it detect all the black bar
-    {
-        sumBlackTime = 0;
-        avgBlackTime = 0;
-
-        for (i = 0; i < blackCounter; i++) // sum black timing
-        {
-            sumBlackTime += black[i]; // sum of timing
-        }
-        avgBlackTime = sumBlackTime / (NUM_BLACK_BAR);
-
-        // add into the barcode array [0] to [17] -> 16 items
-        for (i = 0; i < blackCounter; i++)
-        {
-            if (black[i] < avgBlackTime) // thin black bar
-            {
-                bar[i] = 0;
-            }
-            else // thick black bar
-            {
-                bar[i] = 1;
-            }
-        }
-
-        // find thick / thin timing
-        for (i = whiteOffSet; i < whiteCounter; i++) // sum white timing
-        {
-            sumWhiteTime += white[i];
-        }
-        avgWhiteTime = sumWhiteTime / (NUM_WHITE_BAR - 1);
-
-        for (i = 1; i < whiteCounter; i++)
-        {
-            if (white[i] < avgWhiteTime) // thin white bar
-            {
-                space[i] = 0;
-            }
-            else
-            { // thick white bar
-                space[i] = 1;
-            }
-        }
-        combineArray(bar, space, combined);
-        decipherBarcode(combined);
-        printArray(combined, 30);
-        decodeBarcode();
-
-        blackCounter = 0;
-        whiteCounter = 0;
-    }
-
-    //reset variable;
-    totalAdc = 0;
-    adcInterrupt = 0;
-    memset(barcode, 0, 9);
-    memset(bar, 0, 15);
-    memset(space, 0, 15);
-    memset(combined, 0, 30);
-}
-
-/*barcode irq*/
-void barcode_IRQ()
-{
-    // barcode_sampling();
-    int adc_raw = adc_read(); // raw voltage from ADC
-
-    // printf("Raw value: %u, voltage: %.2f V\n", adc_raw, curatedRes);
-    totalAdc += adc_raw;
-    adcInterrupt++;
-
-    if (adcInterrupt == 1000) // take the average after 999 sampling
-    {
-        avgResult = totalAdc / 1000;
-        curatedRes = avgResult * ADC_CONVERT; // change to voltage
-        if (startTime == 0)
-        {
-            startTime = time_us_32();
-        }
-
-        //printf("%.2f", curatedRes);
-        detectBar_raw(avgResult);
-    }
-} 
-
-
-// int main()
-// {
-//     stdio_init_all();
-//     init_barcode();
-
-//     while (1)
-//     {
-//       barcode_IRQ();
-//     }
-//     return 0;
-// }
